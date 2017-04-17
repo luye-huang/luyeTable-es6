@@ -193,7 +193,7 @@ export default class LuyeTable {
             href += tr[col.params[i]];
           }
           href += _.last(rawUrl);
-          const tpl_a = `<a href="${href}">${col.cname}</a>`;
+          const tpl_a = `<a href="${href}">${col.cdata?tr[col.cdata]:col.cname}</a>`;
           // $('<a></a>').text(col.cname).attr('href', href);
           $td.append(tpl_a);
         }
