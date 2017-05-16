@@ -195,14 +195,14 @@ export default class LuyeTable {
         const $td = $('<td></td>');
         // let td = document.createElement('td');
         if (!col.type) {
-          let tpl_txt = `${tr[col.cdata]}`;
+          let tpl_txt = tr[col.cdata] === undefined? '': tr[col.cdata];
           keywords && keywords.forEach(keyword => {
             if (tpl_txt.includes(keyword)) {
               let yellowstr = `<span class="yellowed">${keyword}</span>`;
               tpl_txt = tpl_txt.replace(keyword, yellowstr);
             }
           });
-          $td.text(tpl_txt);
+          $td.html(tpl_txt);
         }
         else if (col.type == 'a') {
           let rawUrl = col.url.split('@@');
@@ -212,7 +212,7 @@ export default class LuyeTable {
             href += tr[value];
           }
           href += rawUrl.pop();
-          const tpl_a = `<a href="${href}">${col.cname}</a>`;
+          const tpl_a = `<a href="${href}">${col.cdata ? tr[col.cdata] : col.cname}</a>`;
           $td.append(tpl_a);
         }
         if (col.style == 'fakeA') {
@@ -460,7 +460,7 @@ export default class LuyeTable {
       switch (queryParam.predicate) {
         case "eq":
           metadata.processingData = metadata.processingData.filter(item => {
-            yellowed.add(queryParam.arg1);
+            if(!yellowed.includes(queryParam.arg1))yellowed.add(queryParam.arg1);
             return item[queryParam.queryCol] == queryParam.arg1;
           });
           break;
@@ -475,7 +475,7 @@ export default class LuyeTable {
           break;
         case "zkw":
           metadata.processingData = metadata.processingData.filter(item => {
-            yellowed.add(queryParam.arg1);
+            if(!yellowed.includes(queryParam.arg1))yellowed.add(queryParam.arg1);
             return item[queryParam.queryCol].includes(queryParam.arg1);
           });
           break;
