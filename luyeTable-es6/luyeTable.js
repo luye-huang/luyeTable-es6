@@ -1,6 +1,7 @@
 //dependencies: jq, lodash
 import {data} from './data';
 import './luyeTable.less';
+import 'babel-polyfill';
 const saver = require('file-saver');
 const $ = require('jquery');
 const deepClone = require('lodash.clonedeep');
@@ -154,12 +155,11 @@ export default class LuyeTable {
     this.wdtb.find('thead').remove();
     const tpl = String.raw`<thead><tr>
       ${this.metadata.processingColumns.map(column => `
-         <th class="${column.style == "hide" ? "hide" : ""}">${column.cname}<input type="checkbox" class="hide" ${column.style == "hide" ? "value='off'" : "checked='checked'"}/><div><div class="tangle-up arrows"></div><div class="tangle-down arrows"></div></div></th>`)
+         <th class="${column.style == "hide" ? "hide" : ""}">${column.cname}<input type="checkbox" class="hide" ${column.style == "hide" ? "value='off'" : "checked='checked'"}/><div class="${column.type === undefined || column.type === 'a' ? '' : 'hide'}"><div class="tangle-up arrows"></div><div class="tangle-down arrows"></div></div></th>`)
       }
     </tr></thead>`;
     this.wdtb.append(tpl);
-    this.attachSortingEvents();
-    this.attachColumnCheckedEvents();
+    this.delegateTableheadEvents();
   }
 
   renderLeftBoard() {
@@ -191,11 +191,12 @@ export default class LuyeTable {
     console.time('start');
     this.metadata.currentData.forEach(tr => {
       const $tr = $('<tr></tr>');
+      $tr.data('rowData', tr);
       columns.forEach(col => {
         const $td = $('<td></td>');
         // let td = document.createElement('td');
         if (!col.type) {
-          let tpl_txt = tr[col.cdata] === undefined? '': tr[col.cdata];
+          let tpl_txt = tr[col.cdata] === undefined ? '' : tr[col.cdata] + '';
           keywords && keywords.forEach(keyword => {
             if (tpl_txt.includes(keyword)) {
               let yellowstr = `<span class="yellowed">${keyword}</span>`;
@@ -204,7 +205,7 @@ export default class LuyeTable {
           });
           $td.html(tpl_txt);
         }
-        else if (col.type == 'a') {
+        else if (col.type === 'a') {
           let rawUrl = col.url.split('@@');
           let href = "";
           for (let [index, value] of col.params.entries()) {
@@ -215,10 +216,23 @@ export default class LuyeTable {
           const tpl_a = `<a href="${href}">${col.cdata ? tr[col.cdata] : col.cname}</a>`;
           $td.append(tpl_a);
         }
-        if (col.style == 'fakeA') {
+        else if (col.type === 'btns') {
+          col.handlers.forEach(handler=> {
+            const $btn = $(`<button>${handler.btnText}</button>`);
+            $btn.on('click', $tr, handler.handler);
+            $td.append($btn);
+          })
+        }
+        else if (col.type === 'management') {
+          const that = this;
+          that.param.management = true;
+          $td.addClass('row-management').append(`<button class="row-view">查看</button><button class="row-edit">编辑</button><button class="row-delete">删除</button>`);
+          // $td.delegate(that.attachRowManagementEvents);
+        }
+        if (col.style === 'fakeA') {
           $td.addClass('fake-a');
         }
-        else if (col.style == 'hide') {
+        else if (col.style === 'hide') {
           $td.addClass('hide');
         }
         if (col.action) {
@@ -240,6 +254,7 @@ export default class LuyeTable {
     });
     console.timeEnd('end');
     this.wdtb.append($body);
+    this.param.management && this.delegateTablebodyEvents();
   }
 
   renderPages() {
@@ -263,8 +278,8 @@ export default class LuyeTable {
       $pagination.append(`<span class="page-next">&raquo;</span>`);
     }
     this.wdtb.after($pagination);
-    this.attachPagingEvents();
     this.renderPageInfo();
+    this.delegatePagingEvents($pagination);
   }
 
   renderPageInfo() {
@@ -289,6 +304,102 @@ export default class LuyeTable {
     }
   }
 
+  delegateTableheadEvents() {
+    const {param, metadata, that = this} = this;
+    this.wdtb.find('thead').delegate('.arrows', 'click', function () {
+      const $this = $(event.target);
+      if ($this.hasClass('invisible')) {
+        return;
+      }
+      const colTxt = $this.parents('th').text();
+      const sortParam = param.columns.find(item => item.cname == colTxt);
+      if ($this.hasClass('tangle-up')) {
+        // _.sortBy with attr name
+        metadata.processingData = sortBy(metadata.processingData, sortParam.cdata);
+      } else {
+        metadata.processingData = sortBy(metadata.processingData, sortParam.cdata).reverse();
+      }
+      metadata.currentPage = 1;
+      that.refresh();
+      $this.toggleClass('invisible');
+    }).delegate('input', 'click', function () {
+      if ($(this).val() == "on") {
+        $(this).removeAttr('checked');
+        $(this).val('off');
+      }
+      else {
+        $(this).attr('checked', 'checked');
+        $(this).val('on');
+      }
+    });
+  }
+
+  delegateTablebodyEvents() {
+    const that = this;
+    this.wdtb.delegate('.row-view', 'click', function () {
+      $('.detail-modal').remove();
+      const $this = $(this);
+      const data = $this.closest('tr').data('rowData');
+      const $modal = $(`<div class="detail-modal">查看<div class="modal-content"></div><div class="bottom-row"><button class="modal-close">关闭</button></div></div>`);
+      that.wdtb.append($modal);
+      that.metadata.processingColumns.forEach((item)=> {
+        if (!item.type) {
+          $modal.find('.modal-content').append(`<div><span>${item.cname}</span><input value="${data[item.cdata]}" readonly/></div>`);
+        }
+      });
+    }).delegate('.row-edit', 'click', function () {
+      $('.detail-modal').remove();
+      const $this = $(this);
+      const $tr = $this.closest('tr');
+      const data = $tr.data('rowData');
+      const $modal = $(`<div class="detail-modal">编辑<div class="modal-content"></div><div class="bottom-row"><button class="modal-edit">确定</button><button class="modal-close">关闭</button></div></div>`);
+      $modal.find('.modal-edit').data('row', $this.closest('tr'));
+      that.wdtb.append($modal);
+      //to edit editted values
+      const changedTd = Array.from($tr.children()).filter((td)=>td.hasAttribute('data-index'));
+      that.metadata.processingColumns.forEach((item, index)=> {
+        if (!item.type) {
+          console.log(changedTd[index]);
+          $modal.find('.modal-content').append(`<div><span>${item.cname}</span><input index="${index}" value="${changedTd[index]===undefined?data[item.cdata]:changedTd[index].innerHTML}"/></div>`);
+          $tr.children()[index].dataset.index = index;
+        }
+      });
+    }).delegate('.row-delete', 'click', function () {
+      that.param.handlerDelete($(this).closest('tr').data('rowData'));
+      $(this).closest('tr').remove();
+    }).delegate('.modal-edit', 'click', function () {
+      const row = $(this).data('row');
+      const inputs = $(this).closest('.detail-modal').find('input');
+      Array.from(row.children(), (td)=> {
+        if (td.dataset.index !== undefined) {
+          td.innerHTML = inputs[td.dataset.index].value;
+          // td.setAttribute('index', )
+        }
+      });
+      that.param.handlerEdit($(this).data('data'));
+      $(this).closest('.detail-modal').remove();
+    }).delegate('.modal-close', 'click', function () {
+      $(this).closest('.detail-modal').remove();
+    });
+  }
+
+  delegatePagingEvents(element) {
+    const {metadata, that = this} = this;
+    element.delegate('span', 'click', function () {
+      const $this = $(this);
+      if ($this.hasClass('current-page')) {
+        return;
+      } else if ($this.hasClass('page-prev')) {
+        metadata.currentPage = metadata.currentPage > 1 ? metadata.currentPage - 1 : 1;
+      } else if ($this.hasClass('page-next')) {
+        metadata.currentPage = metadata.currentPage < metadata.pageTotal ? metadata.currentPage + 1 : metadata.pageTotal;
+      } else {
+        metadata.currentPage = $this.text();
+      }
+      that.refresh();
+    });
+  }
+
   attachPageSizeEvent() {
     const {param, metadata} = this;
     $('.left-board select').change(() => {
@@ -296,50 +407,6 @@ export default class LuyeTable {
       metadata.pageTotal = Math.ceil(metadata.processingData.length / param.pageCount);
       metadata.currentPage = metadata.currentPage > metadata.pageTotal ? metadata.pageTotal : metadata.currentPage;
       this.refresh();
-    });
-  }
-
-  attachSortingEvents() {
-    const {metadata} = this;
-    //this.wdtb.find('thead .arrows') is not of Array type, cannot forEach
-    Array.from(this.wdtb.find('thead .arrows'), ele => {
-      $(ele).click(() => {
-        const $this = $(event.target);
-        if ($this.hasClass('invisible')) {
-          return;
-        }
-        const colTxt = $this.parents('th').text();
-        const sortParam = this.param.columns.find(item => item.cname == colTxt);
-        if ($this.hasClass('tangle-up')) {
-          // _.sortBy with attr name
-          metadata.processingData = sortBy(metadata.processingData, sortParam.cdata);
-        } else {
-          metadata.processingData = sortBy(metadata.processingData, sortParam.cdata).reverse();
-        }
-        metadata.currentPage = 1;
-        this.refresh();
-        $this.toggleClass('invisible');
-      })
-    });
-  }
-
-  attachPagingEvents() {
-    const {metadata, that = this} = this;
-    Array.from($('.pagination>span'), function (ele) {
-      // change into arrow function, const $this = $(this) does not work
-      $(ele).click(function () {
-        const $this = $(this);
-        if ($this.hasClass('current-page')) {
-          return;
-        } else if ($this.hasClass('page-prev')) {
-          metadata.currentPage = metadata.currentPage > 1 ? metadata.currentPage - 1 : 1;
-        } else if ($this.hasClass('page-next')) {
-          metadata.currentPage = metadata.currentPage < metadata.pageTotal ? metadata.currentPage + 1 : metadata.pageTotal;
-        } else {
-          metadata.currentPage = $this.text();
-        }
-        that.refresh();
-      });
     });
   }
 
@@ -374,19 +441,6 @@ export default class LuyeTable {
           this.resetData();
           this.refresh();
         }
-      }
-    });
-  }
-
-  attachColumnCheckedEvents() {
-    this.wdtb.find('thead input').click(function () {
-      if ($(this).val() == "on") {
-        $(this).removeAttr('checked');
-        $(this).val('off');
-      }
-      else {
-        $(this).attr('checked', 'checked');
-        $(this).val('on');
       }
     });
   }
@@ -457,10 +511,10 @@ export default class LuyeTable {
     this.resetData();
     queryParams = sortBy(queryParams, 'predicate');
     queryParams.forEach(queryParam => {
+      yellowed.add(queryParam.arg1);
       switch (queryParam.predicate) {
         case "eq":
           metadata.processingData = metadata.processingData.filter(item => {
-            if(!yellowed.includes(queryParam.arg1))yellowed.add(queryParam.arg1);
             return item[queryParam.queryCol] == queryParam.arg1;
           });
           break;
@@ -475,7 +529,6 @@ export default class LuyeTable {
           break;
         case "zkw":
           metadata.processingData = metadata.processingData.filter(item => {
-            if(!yellowed.includes(queryParam.arg1))yellowed.add(queryParam.arg1);
             return item[queryParam.queryCol].includes(queryParam.arg1);
           });
           break;
@@ -501,4 +554,3 @@ export default class LuyeTable {
     this.param.el.empty();
   }
 }
-
