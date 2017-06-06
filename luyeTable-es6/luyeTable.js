@@ -352,7 +352,7 @@ export default class LuyeTable {
       const $this = $(this);
       const $tr = $this.closest('tr');
       const data = $tr.data('rowData');
-      const $modal = $(`<div class="detail-modal">编辑<div class="modal-content"></div><div class="bottom-row"><button class="modal-edit">确定</button><button class="modal-close">关闭</button></div></div>`);
+      const $modal = $(`<div class="detail-modal">编辑<div class="modal-content"></div><div class="bottom-row"><button class="modal-edit">确定</button><button class="modal-close">关闭</button></div></div>`).data('data', data);
       $modal.find('.modal-edit').data('row', $this.closest('tr'));
       that.wdtb.append($modal);
       //to edit editted values
@@ -360,12 +360,12 @@ export default class LuyeTable {
       that.metadata.processingColumns.forEach((item, index)=> {
         if (!item.type) {
           console.log(changedTd[index]);
-          $modal.find('.modal-content').append(`<div><span>${item.cname}</span><input index="${index}" value="${changedTd[index]===undefined?data[item.cdata]:changedTd[index].innerHTML}"/></div>`);
+          $modal.find('.modal-content').append(`<div><span>${item.cname}</span><input index="${index}" value="${changedTd[index] === undefined ? data[item.cdata] : changedTd[index].innerHTML}"/></div>`);
           $tr.children()[index].dataset.index = index;
         }
       });
     }).delegate('.row-delete', 'click', function () {
-      that.param.handlerDelete($(this).closest('tr').data('rowData'));
+      that.param.handlerDelete && that.param.handlerDelete($(this).closest('tr').data('rowData'));
       $(this).closest('tr').remove();
     }).delegate('.modal-edit', 'click', function () {
       const row = $(this).data('row');
@@ -376,7 +376,7 @@ export default class LuyeTable {
           // td.setAttribute('index', )
         }
       });
-      that.param.handlerEdit($(this).data('data'));
+      that.param.handlerEdit && that.param.handlerEdit($(this).closest('.detail-modal').data('data'));
       $(this).closest('.detail-modal').remove();
     }).delegate('.modal-close', 'click', function () {
       $(this).closest('.detail-modal').remove();
