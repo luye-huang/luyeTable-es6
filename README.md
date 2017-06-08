@@ -1,8 +1,2 @@
-# luyeTable-es6
-luyeTable's es6 version
+run 'npm start'
 
-1 let
-2 destructuring
-    // let obj = { first: 'hello', last: 'world' };
-    // let { first: f } = obj;
-    // console.log(f );
