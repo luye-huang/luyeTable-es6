@@ -3,6 +3,7 @@
  */
 import LuyeTable from './luyeTable-es6/luyeTable';
 
+console.log(6622);
 var tbParam = {
   el: document.getElementById('table'),
   columns : [{cname : '团队名称', cdata : 'tname', action:'click'},
