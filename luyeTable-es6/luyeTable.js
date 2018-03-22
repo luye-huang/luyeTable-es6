@@ -155,7 +155,7 @@ export default class LuyeTable {
     this.wdtb.find('thead').remove();
     const tpl = String.raw`<thead><tr>
       ${this.metadata.processingColumns.map(column => `
-         <th class="${column.style == "hide" ? "hide" : ""}">${column.cname}<input type="checkbox" class="hide" ${column.style == "hide" ? "value='off'" : "checked='checked'"}/><div class="${column.type === undefined || column.type === 'a' ? '' : 'hide'}"><div class="tangle-up arrows"></div><div class="tangle-down arrows"></div></div></th>`)
+         <th class="${column.style == "hide" ? "hide" : ""}">${column.cname}<input type="checkbox" class="hide" ${column.style == "hide" ? "value='off'" : "checked='checked'"}/><div class="${!column.type || column.type === 'a' ? '' : 'hide'}"><div class="tangle-up arrows"></div><div class="tangle-down arrows"></div></div></th>`)
       }
     </tr></thead>`;
     this.wdtb.append(tpl);
@@ -196,7 +196,7 @@ export default class LuyeTable {
         const $td = $('<td></td>');
         // let td = document.createElement('td');
         if (!col.type) {
-          let tpl_txt = tr[col.cdata] === undefined ? '' : tr[col.cdata] + '';
+          let tpl_txt = tr[col.cdata] ? tr[col.cdata] + '' : '';
           keywords && keywords.forEach(keyword => {
             if (tpl_txt.includes(keyword)) {
               let yellowstr = `<span class="yellowed">${keyword}</span>`;
@@ -360,7 +360,7 @@ export default class LuyeTable {
       that.metadata.processingColumns.forEach((item, index)=> {
         if (!item.type) {
           console.log(changedTd[index]);
-          $modal.find('.modal-content').append(`<div><span>${item.cname}</span><input index="${index}" value="${changedTd[index] === undefined ? data[item.cdata] : changedTd[index].innerHTML}"/></div>`);
+          $modal.find('.modal-content').append(`<div><span>${item.cname}</span><input index="${index}" value="${!changedTd[index] ? data[item.cdata] : changedTd[index].innerHTML}"/></div>`);
           $tr.children()[index].dataset.index = index;
         }
       });
@@ -372,7 +372,7 @@ export default class LuyeTable {
       const inputs = $(this).closest('.detail-modal').find('input');
       const editedData = [];
       Array.from(row.children(), (td)=> {
-        if (td.dataset.index !== undefined) {
+        if (td.dataset.index) {
           td.innerHTML = inputs[td.dataset.index].value;
           editedData.push(inputs[td.dataset.index].value);
         }
